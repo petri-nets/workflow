@@ -6,6 +6,7 @@ import (
 
 var flowDao wfmod.FlowDao
 var executorHandle func(cs *Case, workitem *Workitem) (wait bool, err error)
+var customizeValidator func(tran *wfmod.WfTransition) error
 
 // Workflow 完整的flow结构
 type Workflow struct {
@@ -13,10 +14,19 @@ type Workflow struct {
 	Case       Case
 }
 
-// Init init
-func Init(fd wfmod.FlowDao, executor func(*Case, *Workitem) (wait bool, err error)) {
+// RegFlowDao register flow dao
+func RegFlowDao(fd wfmod.FlowDao) {
 	flowDao = fd
-	executorHandle = executor
+}
+
+// RegExecutorHandle register executor handle
+func RegExecutorHandle(_executorHandle func(*Case, *Workitem) (wait bool, err error)) {
+	executorHandle = _executorHandle
+}
+
+// RegCustomerValidator register customer validator
+func RegCustomerValidator(_customizeValidator func(*wfmod.WfTransition) error) {
+	customizeValidator = _customizeValidator
 }
 
 // GetWorkflowsByStartJob get workflows by start job

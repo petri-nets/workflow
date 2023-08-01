@@ -1,6 +1,7 @@
 package wfmod
 
 // FlowDao flow data interface
+// mockgen -source=./wfmod/dao.go -destination=./wfmod/wfmock/mock.go -package=wfmock
 type FlowDao interface {
 	// GetWorkflowsByStartJob get workflow by start job id
 	GetWorkflowsByStartJob(appID, startJobID int) []WfWorkflow

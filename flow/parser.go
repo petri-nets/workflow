@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -60,26 +59,26 @@ type Parser struct {
 }
 
 // NewParser new parser
-func NewParser(conf string) *Parser {
-	parser := Parser{}
-	json.Unmarshal([]byte(conf), &parser)
+func NewParser(pipe *Pipeline) *Parser {
+	parser := Parser{
+		Pipeline: pipe,
+	}
 	return &parser
 }
 
 // Start start
-func (p *Parser) Start() {
+func (p *Parser) Start() error {
 	if err := p.Validate(); err != nil {
-		return
+		return err
 	}
 	// 编排
 	p.Arrangement()
-
 	// 保存模型
-	p.SaveModel()
+	return p.SaveModel()
 }
 
 // SaveModel save model
-func (p *Parser) SaveModel() {
+func (p *Parser) SaveModel() error {
 	switcher := Switcher{
 		Workflow: workflow{
 			ID:         p.Pipeline.ID,
@@ -93,11 +92,12 @@ func (p *Parser) SaveModel() {
 		Places:      p.places,
 		Transitions: p.transitions,
 	}
-	switcher.Save()
+
+	return switcher.Save()
 }
 
 // Arrangement arrangement
-func (p *Parser) Arrangement() {
+func (p *Parser) Arrangement() error {
 	startPlace := p.newPlace(wfmod.StartPlaceType, "")
 	endPlace := p.newPlace(wfmod.EndPlaceType, "")
 
@@ -108,14 +108,24 @@ func (p *Parser) Arrangement() {
 		Router:  p.Pipeline.Router,
 		Then:    p.Pipeline.Then,
 	}
+
 	// 中间任务编排
-	inPlaces, outPlaces := p.SaveTasks(&startTask, p.Pipeline.Tasks)
+	inPlaces, outPlaces := p.ArrangeTasks(&startTask, p.Pipeline.Tasks)
+	if len(inPlaces) == 0 {
+		return fmt.Errorf("arrange task error: inPlaces empty")
+	}
+
+	if len(outPlaces) == 0 {
+		return fmt.Errorf("arrange task error: outPlaces empty")
+	}
 
 	// startPlace && startTransition
 	p.newTransition(&startTask, wfmod.ArcSEQ, p.arcOutTypeByRouter(startTask.Router), []place{startPlace}, inPlaces)
 
 	// endPlaces && endTransition
 	p.replaceAndDeletePlaces(outPlaces, endPlace)
+
+	return nil
 }
 
 func (p *Parser) arcOutTypeByRouter(router RouterType) wfmod.ArcTypeType {
@@ -146,8 +156,8 @@ func (p *Parser) Validate() error {
 	return nil
 }
 
-// SaveTasks save tasks
-func (p *Parser) SaveTasks(t *task, tasks []*task) (inPlaces, outPlaces []place) {
+// ArrangeTasks save tasks
+func (p *Parser) ArrangeTasks(t *task, tasks []*task) (inPlaces, outPlaces []place) {
 	switch t.Router {
 	case RouterEIF:
 		inPlaces, outPlaces = p.EIfRouter(tasks)
@@ -250,7 +260,7 @@ func (p *Parser) EIfRouter(tasks []*task) (inPlaces, outPlaces []place) {
 		inPlaces = append(inPlaces, inPlace)
 
 		if len(task.Tasks) > 0 {
-			nextInPlaces, nextOutPlaces := p.SaveTasks(task, task.Tasks)
+			nextInPlaces, nextOutPlaces := p.ArrangeTasks(task, task.Tasks)
 			p.newTransition(task, wfmod.ArcSEQ, wfmod.ArcOutORJoin, []place{inPlace}, nextInPlaces)
 			// 需要将nextOutPlaces 删除，并将所有引用的地方修改成outPlace
 			p.replaceAndDeletePlaces(nextOutPlaces, outPlace)
@@ -291,7 +301,7 @@ func (p *Parser) VieRouter(tasks []*task) (inPlaces, outPlaces []place) {
 
 	for _, task := range tasks {
 		if len(task.Tasks) > 0 {
-			nextInPlaces, nextOutPlaces := p.SaveTasks(task, task.Tasks)
+			nextInPlaces, nextOutPlaces := p.ArrangeTasks(task, task.Tasks)
 			p.newTransition(task, wfmod.ArcInImplicitORsplit, wfmod.ArcOutORJoin, inPlaces, nextInPlaces)
 			// 需要将nextOutPlaces 删除，并将所有引用的地方修改成outPlace
 			p.replaceAndDeletePlaces(nextOutPlaces, outPlace)
@@ -312,7 +322,7 @@ func (p *Parser) SeqRouter(tasks []*task) ([]place, []place) {
 
 	for _, task := range tasks {
 		if len(task.Tasks) > 0 {
-			nextInPlaces, nextOutPlaces := p.SaveTasks(task, task.Tasks)
+			nextInPlaces, nextOutPlaces := p.ArrangeTasks(task, task.Tasks)
 			p.newTransition(task, inArcType, p.arcOutTypeByRouter(task.Router), inPlaces, nextInPlaces)
 
 			inPlaces = nextOutPlaces
@@ -337,7 +347,7 @@ func (p *Parser) ParRouter(tasks []*task) (inPlaces, outPlaces []place) {
 		var nextOutPlaces []place
 		if len(task.Tasks) > 0 {
 			// outPlaces
-			nextInPlaces, nextOutPlaces = p.SaveTasks(task, task.Tasks)
+			nextInPlaces, nextOutPlaces = p.ArrangeTasks(task, task.Tasks)
 			p.newTransition(task, wfmod.ArcSEQ, p.arcOutTypeByRouter(task.Router), []place{inPlace}, nextInPlaces)
 			outPlaces = append(outPlaces, nextOutPlaces...)
 		} else {

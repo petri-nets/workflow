@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/petri-nets/workflow/wfmod"
@@ -52,9 +53,9 @@ type Switcher struct {
 }
 
 // Save 保存工作流
-func (s *Switcher) Save() {
-	if !s.Validate() {
-		return
+func (s *Switcher) Save() error {
+	if err := s.Validate(); err != nil {
+		return err
 	}
 
 	flowDao.BeginTransaction()
@@ -64,19 +65,35 @@ func (s *Switcher) Save() {
 		}
 	}()
 
-	workflow := s.SaveWfWorkflow()
+	workflow, err := s.SaveWfWorkflow()
+	if err != nil {
+		flowDao.RollbackTransaction()
+		return err
+	}
 
-	s.SavePlaces(workflow)
+	placeMap, err := s.SavePlaces(workflow)
+	if err != nil {
+		flowDao.RollbackTransaction()
+		return err
+	}
 
+	if err := s.SaveTransitions(workflow, placeMap); err != nil {
+		flowDao.RollbackTransaction()
+		return err
+	}
+
+	flowDao.CommitTransaction()
+
+	return nil
 }
 
 // Validate validate workflow
-func (s *Switcher) Validate() bool {
-	return true
+func (s *Switcher) Validate() error {
+	return nil
 }
 
 // SaveWfWorkflow save workflow
-func (s *Switcher) SaveWfWorkflow() *wfmod.WfWorkflow {
+func (s *Switcher) SaveWfWorkflow() (*wfmod.WfWorkflow, error) {
 	wfWorkflow := wfmod.WfWorkflow{
 		AppID:      s.Workflow.AppID,
 		Name:       s.Workflow.Name,
@@ -90,12 +107,12 @@ func (s *Switcher) SaveWfWorkflow() *wfmod.WfWorkflow {
 	if s.Workflow.ID == 0 {
 		wfWorkflow.CreatedBy = wfWorkflow.UpdatedBy
 	}
-	flowDao.SaveWorkflow(&wfWorkflow)
-	return &wfWorkflow
+	err := flowDao.SaveWorkflow(&wfWorkflow)
+	return &wfWorkflow, err
 }
 
 // SavePlaces save places
-func (s *Switcher) SavePlaces(wfWorkflow *wfmod.WfWorkflow) map[string]*wfmod.WfPlace {
+func (s *Switcher) SavePlaces(wfWorkflow *wfmod.WfWorkflow) (map[string]*wfmod.WfPlace, error) {
 	wfPlaces := make(map[string]*wfmod.WfPlace)
 	for _, place := range s.Places {
 		wfPlace := wfmod.WfPlace{
@@ -104,18 +121,23 @@ func (s *Switcher) SavePlaces(wfWorkflow *wfmod.WfWorkflow) map[string]*wfmod.Wf
 			Type:       place.Type,
 			Name:       place.Name,
 		}
-		flowDao.SavePlace(&wfPlace)
+		err := flowDao.SavePlace(&wfPlace)
+		if err != nil {
+			return wfPlaces, err
+		}
 		wfPlaces[place.Name] = &wfPlace
 	}
-	return wfPlaces
+	return wfPlaces, nil
 }
 
 // SaveTransitions save transitions
-func (s *Switcher) SaveTransitions(wfWorkflow *wfmod.WfWorkflow, wfPlaceMap map[string]*wfmod.WfPlace) {
+func (s *Switcher) SaveTransitions(wfWorkflow *wfmod.WfWorkflow, wfPlaceMap map[string]*wfmod.WfPlace) error {
 	for _, transition := range s.Transitions {
+
 		if transition.Trigger == "" {
 			transition.Trigger = wfmod.TransitionTriggerAuto
 		}
+
 		wfTransition := wfmod.WfTransition{
 			AppID:      wfWorkflow.AppID,
 			WorkflowID: wfWorkflow.ID,
@@ -127,18 +149,33 @@ func (s *Switcher) SaveTransitions(wfWorkflow *wfmod.WfWorkflow, wfPlaceMap map[
 			RoleID:     transition.RoleID,
 		}
 
-		flowDao.SaveTransition(&wfTransition)
+		if customizeValidator != nil {
+			if err := customizeValidator(&wfTransition); err != nil {
+				return fmt.Errorf("transition check error:%v", err)
+			}
+		}
+
+		if err := flowDao.SaveTransition(&wfTransition); err != nil {
+			return fmt.Errorf("save transition error:%v", err)
+		}
 
 		if wfTransition.ID > 0 {
-			s.SaveArcs(&wfTransition, transition.In, wfPlaceMap, wfmod.ArcDirectionIn)
-			s.SaveArcs(&wfTransition, transition.Out, wfPlaceMap, wfmod.ArcDirectionOut)
+			if err := s.SaveArcs(&wfTransition, transition.In, wfPlaceMap, wfmod.ArcDirectionIn); err != nil {
+				return err
+			}
+
+			if err := s.SaveArcs(&wfTransition, transition.Out, wfPlaceMap, wfmod.ArcDirectionOut); err != nil {
+				return err
+			}
 		}
 	}
+
+	return nil
 }
 
 // SaveArcs save arcs
 func (s *Switcher) SaveArcs(wfTransition *wfmod.WfTransition, inArcs []arc,
-	wfPlaceMap map[string]*wfmod.WfPlace, arcDir wfmod.ArcDirectionType) {
+	wfPlaceMap map[string]*wfmod.WfPlace, arcDir wfmod.ArcDirectionType) error {
 
 	for _, arc := range inArcs {
 		wfPlace, ok := wfPlaceMap[arc.Place]
@@ -155,6 +192,11 @@ func (s *Switcher) SaveArcs(wfTransition *wfmod.WfTransition, inArcs []arc,
 			Type:         arc.Type,
 			Condition:    arc.Condition,
 		}
-		flowDao.SaveArc(&wfArc)
+
+		if err := flowDao.SaveArc(&wfArc); err != nil {
+			return fmt.Errorf("arc[%#v] save error:%v", wfArc, err)
+		}
 	}
+
+	return nil
 }
