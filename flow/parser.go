@@ -23,31 +23,31 @@ const (
 )
 
 type task struct {
-	Name      string                      `json:"name"`
-	Desc      string                      `json:"desc"`
-	Trigger   wfmod.TransitionTriggerType `json:"trigger"`
-	Job       int                         `json:"job_id"`
-	Role      int                         `json:"role_id"`
-	Router    RouterType                  `json:"router"`
-	Condition string                      `json:"condition"`
-	Tasks     []*task                     `json:"tasks"`
-	Then      *task                       `json:"then"`
-	Goto      string                      `json:"goto"` // 仅在if路由下有效
+	Name      string                      `yaml:"name" json:"name"`
+	Desc      string                      `yaml:"desc" json:"desc"`
+	Trigger   wfmod.TransitionTriggerType `yaml:"trigger" json:"trigger"`
+	Job       int                         `yaml:"job_id" json:"job_id"`
+	Role      int                         `yaml:"role_id" json:"role_id"`
+	Router    RouterType                  `yaml:"router" json:"router"`
+	Condition string                      `yaml:"condition" json:"condition"`
+	Tasks     []*task                     `yaml:"tasks" json:"tasks"`
+	Then      *task                       `yaml:"then" json:"then"`
+	Goto      string                      `yaml:"goto" json:"goto"` // 仅在if路由下有效
 }
 
 // Pipeline pipeline
 type Pipeline struct {
-	ID         int        `json:"id"`
-	Name       string     `json:"name"`
-	Desc       string     `json:"desc"`
-	AppID      int        `json:"app_id"`
-	StartJobID int        `json:"start_job_id"`
-	StartDate  time.Time  `json:"start_date"`
-	EndDate    time.Time  `json:"end_date"`
-	Operator   string     `json:"operator"`
-	Router     RouterType `json:"router"`
-	Tasks      []*task    `json:"tasks"`
-	Then       *task      `json:"then"`
+	ID         int        `yaml:"id" json:"id"`
+	Name       string     `yaml:"name" json:"name"`
+	Desc       string     `yaml:"desc" json:"desc"`
+	AppID      int        `yaml:"app_id" json:"app_id"`
+	StartJobID int        `yaml:"start_job_id" json:"start_job_id"`
+	StartDate  time.Time  `yaml:"start_date" json:"start_date"`
+	EndDate    time.Time  `yaml:"end_date" json:"end_date"`
+	Operator   string     `yaml:"operator" json:"operator"`
+	Router     RouterType `yaml:"router" json:"router"`
+	Tasks      []*task    `yaml:"tasks" json:"tasks"`
+	Then       *task      `yaml:"then" json:"then"`
 }
 
 // Parser parser

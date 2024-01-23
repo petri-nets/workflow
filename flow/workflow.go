@@ -8,12 +8,6 @@ var flowDao wfmod.FlowDao
 var executorHandle func(cs *Case, workitem *Workitem) (wait bool, err error)
 var customizeValidator func(tran *wfmod.WfTransition) error
 
-// Workflow 完整的flow结构
-type Workflow struct {
-	WfWorkflow wfmod.WfWorkflow
-	Case       Case
-}
-
 // RegFlowDao register flow dao
 func RegFlowDao(fd wfmod.FlowDao) {
 	flowDao = fd
@@ -39,8 +33,36 @@ func GetWorkflowsByStartJob(appID, startJobID int) []Workflow {
 	return workflows
 }
 
-// Start 启动工作流新的case
+// StartWorkflow 启动工作流新的case
+func StartWorkflow(appID, startJobID int, wfContext wfmod.WfContextType, operator string) {
+
+	workflows := GetWorkflowsByStartJob(appID, startJobID)
+
+	for _, workflow := range workflows {
+		// todo 获取用用户信息
+		go workflow.Start(wfContext, operator)
+	}
+}
+
+// ContinueCase continue case
+func ContinueCase(appID, jobID int, jobOutput wfmod.WfContextType) {
+	transitions := GetTransitionsByWorkitemJob(appID, jobID)
+
+	for _, transition := range transitions {
+		// 设置workitem为完成状态
+		go transition.WorkitemFinishedHandle(jobOutput)
+	}
+}
+
+// Workflow 完整的flow结构
+type Workflow struct {
+	WfWorkflow wfmod.WfWorkflow
+	Case       Case
+}
+
+// Start 启动工作流
 func (w *Workflow) Start(wfContext wfmod.WfContextType, operator string) {
+
 	w.Case = NewCase(wfContext, w, operator)
 
 	place := GetStartPlace(&w.Case)

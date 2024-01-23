@@ -1,0 +1,8 @@
+database: #数据库
+  type: mysql #数据库类型
+  host: 9.134.92.70
+  port: 3306 
+  database: tdjob-dev #数据库名
+  user: tapdev  #账号
+  password: 4woshengri #密码
+  table_prefix: 

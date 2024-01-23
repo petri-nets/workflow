@@ -112,6 +112,8 @@ CREATE TABLE `wf_workitems` (
   `deadline` datetime default NULL,
   `role_id` int(11) unsigned NOT NULL default '0',
   `user` VARCHAR(32) NOT NULL DEFAULT '' ,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY  (`id`),
   KEY `transition_idx` (`app_id`, `workflow_id`,`transition_id`) USING BTREE,
   KEY `job_idx` (`app_id`, `job_id`) USING BTREE

@@ -2,6 +2,7 @@ package flow
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/petri-nets/workflow/wfmod"
 )
@@ -98,6 +99,7 @@ func (t *Token) Lock() error {
 // Consume consume the token
 func (t *Token) Consume() error {
 	t.WfToken.Status = wfmod.TokenStatusConsume
+	t.WfToken.ConsumedDate = time.Now()
 	flowDao.SaveToken(&t.WfToken)
 	return nil
 }
